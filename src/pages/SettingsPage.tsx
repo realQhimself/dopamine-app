@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Volume2, VolumeX, Vibrate, Sparkles, Download, Upload, Trash2 } from 'lucide-react';
+import { Volume2, VolumeX, Vibrate, Sparkles, Download, Upload, Trash2, CalendarDays, LogOut, Loader2 } from 'lucide-react';
 import { useSettingsStore } from '../stores/useSettingsStore';
+import { useCalendarStore } from '../stores/useCalendarStore';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 import { Card } from '../components/shared/Card';
 import { pageVariants } from '../lib/animations';
@@ -10,6 +11,14 @@ import { getTodayString } from '../lib/dateUtils';
 export default function SettingsPage() {
   const { play, haptic } = useSoundEffects();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+
+  // Calendar store
+  const calendarConnected = useCalendarStore((s) => s.connected);
+  const calendarEmail = useCalendarStore((s) => s.userEmail);
+  const calendarError = useCalendarStore((s) => s.error);
+  const connectCalendar = useCalendarStore((s) => s.connect);
+  const disconnectCalendar = useCalendarStore((s) => s.disconnect);
 
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const hapticEnabled = useSettingsStore((s) => s.hapticEnabled);
@@ -136,6 +145,67 @@ export default function SettingsPage() {
             </button>
           ))}
         </div>
+      </Card>
+
+      {/* Calendar Integration */}
+      <Card className="p-4 mb-3">
+        <div className="flex items-center gap-2 mb-3">
+          <CalendarDays size={18} className="text-blue-500" />
+          <h2 className="text-sm font-semibold text-gray-700">Google Calendar</h2>
+        </div>
+
+        {calendarConnected ? (
+          <div>
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="text-sm text-gray-700">Connected</p>
+                {calendarEmail && (
+                  <p className="text-xs text-gray-400">{calendarEmail}</p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  disconnectCalendar();
+                  play('click');
+                  haptic();
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-500 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <LogOut size={12} />
+                Disconnect
+              </button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1">
+              Today's events auto-import as checkable tasks each morning.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <p className="text-xs text-gray-500 mb-3">
+              Connect your Google Calendar to auto-import today's events as tasks. Tip: subscribe your Apple Calendar in Google to get both.
+            </p>
+            <button
+              onClick={async () => {
+                setConnecting(true);
+                play('click');
+                haptic();
+                await connectCalendar();
+                setConnecting(false);
+              }}
+              disabled={connecting}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-blue-500 text-white text-sm font-medium rounded-xl hover:bg-blue-600 transition-colors disabled:opacity-50"
+            >
+              {connecting ? (
+                <><Loader2 size={16} className="animate-spin" /> Connecting...</>
+              ) : (
+                <><CalendarDays size={16} /> Connect Google Calendar</>
+              )}
+            </button>
+            {calendarError && (
+              <p className="text-xs text-red-500 mt-2">{calendarError}</p>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Data */}

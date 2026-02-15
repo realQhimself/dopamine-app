@@ -1,5 +1,5 @@
 export type EnergyLevel = 'high' | 'medium' | 'low';
-export type TaskCategory = 'routine' | 'work' | 'health' | 'creative' | 'admin' | 'custom';
+export type TaskCategory = 'routine' | 'work' | 'health' | 'creative' | 'admin' | 'custom' | 'calendar';
 
 export interface Task {
   id: string;
@@ -44,6 +44,16 @@ export interface DayRecord {
   xpEarned: number;
   energyLevel: EnergyLevel | null;
   wasMVD: boolean;
+}
+
+export interface CalendarEvent {
+  id: string;
+  summary: string;
+  start: string;       // ISO datetime or date
+  end: string;
+  allDay: boolean;
+  calendarName: string;
+  calendarColor: string;
 }
 
 export type CelebrationEvent =

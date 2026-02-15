@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, CalendarDays, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTaskStore } from '../stores/useTaskStore';
 import { useProgressStore } from '../stores/useProgressStore';
 import { useSettingsStore } from '../stores/useSettingsStore';
+import { useCalendarStore } from '../stores/useCalendarStore';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 import { useCelebration } from '../hooks/useCelebration';
 import { EnergySelector } from '../components/tasks/EnergySelector';
@@ -40,9 +41,12 @@ export default function TodayPage() {
   const addXP = useProgressStore((s) => s.addXP);
   const recordDay = useProgressStore((s) => s.recordDay);
 
-  // Settings
-  const onboardingComplete = useSettingsStore((s) => s.onboardingComplete);
-  const completeOnboarding = useSettingsStore((s) => s.completeOnboarding);
+  // Calendar store
+  const calendarConnected = useCalendarStore((s) => s.connected);
+  const calendarEvents = useCalendarStore((s) => s.events);
+  const calendarSyncing = useCalendarStore((s) => s.syncing);
+  const syncToday = useCalendarStore((s) => s.syncToday);
+  const lastSyncDate = useCalendarStore((s) => s.lastSyncDate);
 
   // Reset daily tasks on mount
   useEffect(() => {
@@ -60,6 +64,50 @@ export default function TodayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-sync calendar events on mount
+  useEffect(() => {
+    if (calendarConnected && lastSyncDate !== getTodayString()) {
+      syncToday();
+    }
+  }, [calendarConnected, lastSyncDate, syncToday]);
+
+  // Convert calendar events to tasks (merged into visible list)
+  const calendarTasks = useMemo(() => {
+    if (!calendarConnected || calendarEvents.length === 0) return [];
+    const existingCalIds = new Set(
+      tasks.filter((t) => t.id.startsWith('cal_')).map((t) => t.id),
+    );
+    return calendarEvents
+      .filter((e) => !existingCalIds.has(`cal_${e.id}`))
+      .map((event, i) => {
+        const startDate = new Date(event.start);
+        const endDate = new Date(event.end);
+        const durationMin = event.allDay ? 30 : Math.max(5, Math.round((endDate.getTime() - startDate.getTime()) / 60000));
+        const timeStr = event.allDay
+          ? 'All day'
+          : startDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+        return {
+          id: `cal_${event.id}`,
+          text: `${timeStr} — ${event.summary}`,
+          completed: false,
+          completedAt: null,
+          category: 'calendar' as const,
+          energyLevel: 'medium' as const,
+          estimatedMinutes: durationMin,
+          isMVD: false,
+          isQuickWin: durationMin <= 2,
+          xpReward: 10,
+          recurring: false,
+          streak: 0,
+          bestStreak: 0,
+          lastCompletedDate: null,
+          completedDates: [],
+          createdAt: new Date().toISOString(),
+          sortOrder: -1000 + i, // Calendar tasks sort to top
+        };
+      });
+  }, [calendarConnected, calendarEvents, tasks]);
+
   // Compute derived state reactively (not via store methods which don't trigger re-renders)
   const visibleTasks = useMemo(() => {
     let filtered = tasks;
@@ -68,11 +116,13 @@ export default function TodayPage() {
     } else if (todayEnergy === 'low') {
       filtered = filtered.filter((t) => t.energyLevel !== 'high');
     }
-    return [...filtered].sort((a, b) => {
+    // Merge in calendar tasks (only in non-MVD mode)
+    const allTasks = mvdMode ? [...filtered] : [...filtered, ...calendarTasks];
+    return allTasks.sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       return a.sortOrder - b.sortOrder;
     });
-  }, [tasks, mvdMode, todayEnergy]);
+  }, [tasks, mvdMode, todayEnergy, calendarTasks]);
 
   const quickWins = useMemo(
     () => tasks.filter((t) => t.isQuickWin && !t.completed),
@@ -159,7 +209,19 @@ export default function TodayPage() {
       animate="animate"
     >
       {/* Greeting */}
-      <h1 className="text-xl font-bold text-gray-900 mb-1">{getGreeting()}</h1>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-xl font-bold text-gray-900">{getGreeting()}</h1>
+        {calendarConnected && (
+          <button
+            onClick={() => syncToday()}
+            disabled={calendarSyncing}
+            className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-600 disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={calendarSyncing ? 'animate-spin' : ''} />
+            {calendarSyncing ? 'Syncing...' : <><CalendarDays size={12} /> {calendarEvents.length} events</>}
+          </button>
+        )}
+      </div>
       <p className="text-sm text-gray-500 mb-4">Let's make today count.</p>
 
       {/* Energy check-in */}

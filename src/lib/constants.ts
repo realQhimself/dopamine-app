@@ -38,4 +38,5 @@ export const CATEGORY_COLORS: Record<string, string> = {
   creative: '#f59e0b',
   admin: '#6b7280',
   custom: '#f97316',
+  calendar: '#3b82f6',
 };

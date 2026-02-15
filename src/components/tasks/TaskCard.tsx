@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Star, Trash2 } from 'lucide-react';
+import { Clock, Star, Trash2, CalendarDays } from 'lucide-react';
 import type { Task } from '../../types';
 import { CheckAnimation } from '../celebrations/CheckAnimation';
 import { XPFloat } from '../celebrations/XPFloat';
@@ -78,6 +78,12 @@ export function TaskCard({
               <span className="flex items-center gap-0.5 text-[10px] text-amber-500">
                 <Star size={10} fill="currentColor" />
                 Essential
+              </span>
+            )}
+            {task.category === 'calendar' && (
+              <span className="flex items-center gap-0.5 text-[10px] text-blue-500">
+                <CalendarDays size={10} />
+                Calendar
               </span>
             )}
             <span

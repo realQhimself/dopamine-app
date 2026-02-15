@@ -16,6 +16,9 @@ import { XPBar } from '../components/progress/XPBar';
 import { StreakCounter } from '../components/progress/StreakCounter';
 import { DailyProgress } from '../components/progress/DailyProgress';
 import { CelebrationOverlay } from '../components/celebrations/CelebrationOverlay';
+import { ChatFAB } from '../components/chat/ChatFAB';
+import { ChatPanel } from '../components/chat/ChatPanel';
+import { useChatStore } from '../stores/useChatStore';
 import { XP_VALUES } from '../lib/constants';
 import { STARTER_TASKS } from '../lib/taskTemplates';
 import { pageVariants } from '../lib/animations';
@@ -25,6 +28,8 @@ export default function TodayPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const { play, haptic } = useSoundEffects();
   const { current, dismiss, enqueue, enqueueOne } = useCelebration();
+  const chatOpen = useChatStore((s) => s.isOpen);
+  const toggleChat = useChatStore((s) => s.toggle);
 
   // Task store
   const tasks = useTaskStore((s) => s.tasks);
@@ -267,6 +272,10 @@ export default function TodayPage() {
         onClose={() => setShowAddModal(false)}
         onAdd={addTask}
       />
+
+      {/* Chat FAB + Panel */}
+      <ChatFAB />
+      <ChatPanel isOpen={chatOpen} onClose={toggleChat} />
 
       {/* Celebrations */}
       <CelebrationOverlay event={current} onDismiss={dismiss} />

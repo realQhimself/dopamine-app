@@ -1,6 +1,6 @@
 import type { CalendarEvent } from '../types';
 
-const SCOPES = 'https://www.googleapis.com/auth/calendar.readonly';
+const SCOPES = 'https://www.googleapis.com/auth/calendar.events';
 const CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
 
 let tokenClient: google.accounts.oauth2.TokenClient | null = null;
@@ -126,6 +126,39 @@ export async function fetchTodayEvents(accessToken: string): Promise<CalendarEve
   allEvents.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
   return allEvents;
+}
+
+/** Create an event on the user's primary calendar */
+export async function createCalendarEvent(
+  accessToken: string,
+  event: {
+    summary: string;
+    description?: string;
+    startTime: string; // ISO datetime
+    endTime: string;   // ISO datetime
+  },
+): Promise<{ id: string; htmlLink: string }> {
+  const res = await fetch(`${CALENDAR_API}/calendars/primary/events`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      summary: event.summary,
+      description: event.description,
+      start: { dateTime: event.startTime },
+      end: { dateTime: event.endTime },
+    }),
+  });
+
+  if (!res.ok) {
+    if (res.status === 401) throw new Error('TOKEN_EXPIRED');
+    throw new Error(`Failed to create event: ${res.status}`);
+  }
+
+  const data = await res.json();
+  return { id: data.id, htmlLink: data.htmlLink };
 }
 
 // Type augmentation for Google Identity Services

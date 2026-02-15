@@ -8,6 +8,7 @@ import {
   refreshAccessToken,
   revokeToken,
   fetchTodayEvents,
+  createCalendarEvent,
 } from '../lib/googleCalendar';
 import { getTodayString } from '../lib/dateUtils';
 
@@ -28,6 +29,7 @@ interface CalendarState {
   connect: () => Promise<void>;
   disconnect: () => void;
   syncToday: () => Promise<void>;
+  pushTaskToCalendar: (task: { text: string; startTime: string; endTime: string }) => Promise<{ success: boolean; error?: string }>;
   isTokenValid: () => boolean;
 }
 
@@ -168,11 +170,75 @@ export const useCalendarStore = create<CalendarState>()(
           }
         }
       },
+
+      pushTaskToCalendar: async (task) => {
+        const state = get();
+
+        if (!state.connected || !state.accessToken) {
+          return { success: false, error: 'Calendar not connected' };
+        }
+
+        // If token expired, try silent refresh first
+        if (!state.isTokenValid()) {
+          if (!CLIENT_ID) {
+            return { success: false, error: 'Google Client ID not configured' };
+          }
+
+          try {
+            await loadGoogleScript();
+
+            const refreshed = await new Promise<boolean>((resolve) => {
+              initTokenClient(
+                CLIENT_ID,
+                (token, expiresAt) => {
+                  set({ accessToken: token, tokenExpiresAt: expiresAt });
+                  resolve(true);
+                },
+                () => {
+                  set({ connected: false, accessToken: null, error: 'Session expired — reconnect calendar' });
+                  resolve(false);
+                },
+              );
+              refreshAccessToken();
+            });
+
+            if (!refreshed) {
+              return { success: false, error: 'Session expired — reconnect calendar' };
+            }
+          } catch {
+            return { success: false, error: 'Failed to refresh token' };
+          }
+        }
+
+        const token = get().accessToken;
+        if (!token) {
+          return { success: false, error: 'No access token available' };
+        }
+
+        try {
+          await createCalendarEvent(token, {
+            summary: task.text,
+            startTime: task.startTime,
+            endTime: task.endTime,
+          });
+          return { success: true };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+
+          if (msg === 'TOKEN_EXPIRED') {
+            // Force token expiry and retry once
+            set({ tokenExpiresAt: 0 });
+            return get().pushTaskToCalendar(task);
+          }
+
+          return { success: false, error: msg };
+        }
+      },
     }),
     {
       name: 'dopamine-calendar',
       version: 1,
-      partials: (state) => ({
+      partialize: (state) => ({
         connected: state.connected,
         accessToken: state.accessToken,
         tokenExpiresAt: state.tokenExpiresAt,

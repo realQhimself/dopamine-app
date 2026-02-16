@@ -59,10 +59,24 @@ Rules:
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getApiKey(): string {
-  const key = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
-  if (!key) throw new Error('VITE_GEMINI_API_KEY is not set');
+const API_KEY_STORAGE_KEY = 'dopamine-gemini-api-key';
+
+export function getApiKey(): string {
+  const key = localStorage.getItem(API_KEY_STORAGE_KEY);
+  if (!key) throw new Error('NO_API_KEY');
   return key;
+}
+
+export function setApiKey(key: string): void {
+  localStorage.setItem(API_KEY_STORAGE_KEY, key);
+}
+
+export function hasApiKey(): boolean {
+  return !!localStorage.getItem(API_KEY_STORAGE_KEY);
+}
+
+export function clearApiKey(): void {
+  localStorage.removeItem(API_KEY_STORAGE_KEY);
 }
 
 interface GeminiContent {

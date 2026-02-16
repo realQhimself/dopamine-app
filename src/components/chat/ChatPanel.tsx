@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, Send } from 'lucide-react';
+import { X, Sparkles, Send, Key } from 'lucide-react';
 import { useChatStore } from '../../stores/useChatStore';
 import { ChatMessageBubble } from './ChatMessage';
 import type { ChatMessage } from './ChatMessage';
+import { hasApiKey, setApiKey, clearApiKey } from '../../lib/geminiAI';
 
 export function ChatPanel({
   isOpen,
@@ -13,8 +14,15 @@ export function ChatPanel({
   onClose: () => void;
 }) {
   const [input, setInput] = useState('');
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [keyConfigured, setKeyConfigured] = useState(hasApiKey);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Re-check key status when panel opens
+  useEffect(() => {
+    if (isOpen) setKeyConfigured(hasApiKey());
+  }, [isOpen]);
 
   const messages = useChatStore((s) => s.messages) as ChatMessage[];
   const isTyping = useChatStore((s) => s.isTyping);
@@ -80,12 +88,23 @@ export function ChatPanel({
                   <p className="text-[10px] text-gray-400">Your ADHD coach</p>
                 </div>
               </div>
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
-              >
-                <X size={18} className="text-gray-400" />
-              </button>
+              <div className="flex items-center gap-1">
+                {keyConfigured && (
+                  <button
+                    onClick={() => { clearApiKey(); setKeyConfigured(false); }}
+                    className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                    title="Remove API key"
+                  >
+                    <Key size={14} className="text-gray-400" />
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+                >
+                  <X size={18} className="text-gray-400" />
+                </button>
+              </div>
             </div>
 
             {/* Messages */}
@@ -93,7 +112,56 @@ export function ChatPanel({
               ref={scrollRef}
               className="flex-1 overflow-y-auto px-4 py-3 space-y-3"
             >
-              {messages.length === 0 && !isTyping && (
+              {!keyConfigured && (
+                <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center mb-3">
+                    <Key size={20} className="text-amber-500" />
+                  </div>
+                  <p className="text-sm text-gray-500 leading-relaxed mb-4">
+                    To chat with Spark, enter your{' '}
+                    <a
+                      href="https://aistudio.google.com/apikey"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-600 underline"
+                    >
+                      Google Gemini API key
+                    </a>
+                    . It's free and stays on your device.
+                  </p>
+                  <div className="flex gap-2 w-full max-w-xs">
+                    <input
+                      type="password"
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && apiKeyInput.trim()) {
+                          setApiKey(apiKeyInput.trim());
+                          setApiKeyInput('');
+                          setKeyConfigured(true);
+                        }
+                      }}
+                      placeholder="AIza..."
+                      className="flex-1 px-3 py-2 bg-white rounded-xl text-sm border border-gray-200 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                    />
+                    <button
+                      onClick={() => {
+                        if (apiKeyInput.trim()) {
+                          setApiKey(apiKeyInput.trim());
+                          setApiKeyInput('');
+                          setKeyConfigured(true);
+                        }
+                      }}
+                      disabled={!apiKeyInput.trim()}
+                      className="px-4 py-2 rounded-xl bg-amber-500 text-white text-sm font-medium disabled:opacity-40"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {keyConfigured && messages.length === 0 && !isTyping && (
                 <div className="flex flex-col items-center justify-center h-full text-center px-6">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center mb-3">
                     <Sparkles size={20} className="text-amber-500" />
@@ -134,25 +202,27 @@ export function ChatPanel({
             </div>
 
             {/* Input bar */}
-            <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-200 bg-white flex-shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask Spark anything..."
-                className="flex-1 px-4 py-2.5 bg-gray-50 rounded-xl text-sm border border-gray-200 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
-              />
-              <motion.button
-                whileTap={{ scale: 0.9 }}
-                onClick={handleSend}
-                disabled={!input.trim()}
-                className="w-10 h-10 flex items-center justify-center rounded-xl bg-amber-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-              >
-                <Send size={16} />
-              </motion.button>
-            </div>
+            {keyConfigured && (
+              <div className="flex items-center gap-2 px-4 py-3 border-t border-gray-200 bg-white flex-shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ask Spark anything..."
+                  className="flex-1 px-4 py-2.5 bg-gray-50 rounded-xl text-sm border border-gray-200 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-100"
+                />
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={handleSend}
+                  disabled={!input.trim()}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-amber-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+                >
+                  <Send size={16} />
+                </motion.button>
+              </div>
+            )}
           </motion.div>
         </div>
       )}
